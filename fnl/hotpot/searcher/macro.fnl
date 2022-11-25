@@ -31,7 +31,13 @@
         ;; when refreshing the cache.
         (dep-map.set-macro-modname-path modname path)
         ;; eval macro as per fennel's implementation.
-        (fennel.eval code options modname)))))
+        (let [{: searcher} (require :hotpot.searcher.macro)
+              _ (table.insert package.loaders 1 searcher)
+              (ok? mod) (pcall fennel.eval code options modname)
+              _ (table.remove package.loaders 1)]
+          (if ok?
+            mod
+            (error mod)))))))
 
 (fn create-loader [modname path]
   "Returns a loader function for either a lua or fnl source file"
