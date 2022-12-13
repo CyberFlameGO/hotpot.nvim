@@ -85,7 +85,11 @@
   ;; add an extension because we will check for both .lua and .fnl
   (let [{: path-separator} (require :hotpot.fs)
         slashed-modname (string.gsub dotted-modname "%." (path-separator))
-        opts (or opts {})]
+        opts (or opts {})
+        {: config} (require :hotpot.runtime)]
+    ;; probably we only want to pass the user option on if we have not set it
+    ;; ourselves which we do for macros.
+    (tset opts :fennel-only? (or opts.fennel-only? (config.fennel-only? dotted-modname)))
     (or (search-rtp slashed-modname opts)
         (search-package-path slashed-modname opts)
         (values nil))))

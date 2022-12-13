@@ -15,6 +15,7 @@
   {:compiler {:modules {}
               :macros {:env :_COMPILER}
               :traceback :hotpot}
+   :fennel-only? #false
    :enable_hotpot_diagnostics true
    :provide_require_fennel false})
 
@@ -25,9 +26,11 @@
 
 (fn M.set-config [user-config]
   (let [new-config (M.default-config)]
-    (each [_ k (ipairs [:modules :macros :traceback])]
+    (each [_ k (ipairs [:modules :macros :traceback :fennel-only?])]
       (match (?. user-config :compiler k)
         val (tset new-config :compiler k val)))
+    (match (?. user-config :fennel-only?)
+      val (tset new-config :fennel-only? val))
     (match (?. user-config :provide_require_fennel)
       val (tset new-config :provide_require_fennel val))
     (match (?. user-config :enable_hotpot_diagnostics)
