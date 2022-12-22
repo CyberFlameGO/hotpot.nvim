@@ -47,12 +47,8 @@
         ;; still return the in-cache-path as a "hope"
         (nil err) (values in-cache-path)))))
 
-(fn new-module-record [modname files timestamp loader]
-  (let [{: file-mtime} (require :hotpot.fs)]
-    {: modname
-     : files
-     : timestamp
-     :loader (string.dump loader)}))
+(λ new-module-record [modname files loader]
+  {: modname : files :loader (string.dump loader)})
 
 (fn hydrate-records [path]
   (match (pcall #(with-open [fin (io.open path :rb)]
@@ -62,7 +58,7 @@
                                     {: version : data} (mpack.decode bytes)]
                                 (match version
                                   index-version data
-                                  _ {}))))
+                                  _ {})))))
     ;; load was fine, return records
     (true records) (values records)
     ;; load failed, this could be due to a missing index or corrupted index,
@@ -90,16 +86,28 @@
   if it is stale and return nil"
   (expect (= :table (type index)) "index must be table, got %q" index)
   (expect (= :string (type modname)) "modname must be string, got %q" modname)
+
+  (fn safe-stat [path]
+    ;; not in fs module as those calls raise by tradition and existed before
+    ;; match-try
+    (match (vim.loop.fs_stat path)
+      {: mtime : size} {:mtime mtime.sec : size}
+      _ (values nil (string.format "could not stat %s" path))))
   (match (. index :modules modname)
     ;; if we have any record, check its ok to use otherwise return nil
-    record (let [{: file-mtime : file-exists?} (require :hotpot.fs)
-                 {: files : timestamp : loader} record
+    record (let [{: file-exists?} (require :hotpot.fs)
+                 {: files : loader} record
                  ;; dont use the cached record if the file is removed
                  ;; or the file is stale or any dependency is stale
-                 use-record? (accumulate [ok? true _ file (ipairs files) :until (not ok?)]
-                                         (and ok?
-                                              (file-exists? file)
-                                              (<= (file-mtime file) timestamp)))]
+                 use-record? (accumulate [ok? true _ file (ipairs files) &until (not ok?)]
+                               (match-try file
+                                 {: path :mtime index-mtime :size index-size} (file-exists? path)
+                                 true (safe-stat path)
+                                 {:size disk-size :mtime disk-mtime} (and (= disk-size index-size)
+                                                                          (= disk-mtime index-mtime))
+                                 true true
+                                 (catch
+                                   _ false)))]
              ;; return good record or nil out existing and return nil
              (if use-record? record (tset index.modules modname nil)))))
 
@@ -117,8 +125,8 @@
             nil (let [{: searcher} (require :hotpot.searcher.module)]
                   (match (searcher modname)
                     ;; found module and got loader
-                    (loader {: path : files : timestamp})
-                    (let [record (new-module-record modname files timestamp loader)]
+                    (loader {: files})
+                    (let [record (new-module-record modname files loader)]
                       (persist-record index modname record)
                       (values (loadstring record.loader)))
                     ;; failed out
