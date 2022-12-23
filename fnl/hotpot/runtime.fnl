@@ -15,6 +15,7 @@
   {:compiler {:modules {}
               :macros {:env :_COMPILER}
               :traceback :hotpot}
+   :colocate false
    :enable_hotpot_diagnostics true
    :provide_require_fennel false})
 
@@ -28,8 +29,17 @@
     (each [_ k (ipairs [:modules :macros :traceback])]
       (match (?. user-config :compiler k)
         val (tset new-config :compiler k val)))
+    ;; TODO dont write this so absolutely terribly please
+
+    ;; compile to lua/* instead of cache folder, also disables our own lua loader for now
+    (match (?. user-config :colocate)
+      val (tset new-config :colocate val))
+
+    ;; make require :fennel work
     (match (?. user-config :provide_require_fennel)
       val (tset new-config :provide_require_fennel val))
+
+    ;; automatically attach diagnostics to fnl files
     (match (?. user-config :enable_hotpot_diagnostics)
       val (tset new-config :enable_hotpot_diagnostics val))
     ;; better to hard fail this now, than fail it when something else fails
