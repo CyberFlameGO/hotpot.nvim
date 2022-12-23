@@ -136,21 +136,27 @@
 (fn search-index [index modname]
   "Search the index for module. Will return a bytecode loader if one exists and
   is not stale, otherwise fall back to disk searchers."
+  (local {: config} (require :hotpot.runtime))
   (match (= :hotpot (string.sub modname 1 6))
     ;; unfortunately we cant (currently?) comfortably index hotpot *with* hotpot
     ;; so these requires are passed directly to the next searcher.
     ;; It would not be unreasonable to pre-cook hotpot modules into the cache
     ;; when bootstrapping.
     true (values nil)
+    ;; TODO: require fnl, -> lua file, delete lua file, require fennel -> no lua as index does not check output exists.
     false (match (get-record-if-current index modname)
-            {: loader} (loadstring loader)
+            {: loader} (if config.colocate
+                         (values "hotpot defer lua load upstream") ;; defer to upstream loader when colocating
+                         (values (loadstring loader)))
             nil (let [{: searcher} (require :hotpot.searcher.module)]
                   (match (searcher modname)
                     ;; found module and got loader
                     (loader {: files})
                     (let [record (new-module-record modname files loader)]
                       (persist-record index modname record)
-                      (values (loadstring record.loader)))
+                      (if config.colocate
+                        (values "hotpot defering lua load upstream") ;; defer to upstream loader when colocating
+                        (values (loadstring record.loader))))
                     ;; failed out
                     (where (err) (= :string (type err)))
                     (values err))))))
