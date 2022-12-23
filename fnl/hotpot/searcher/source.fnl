@@ -63,9 +63,16 @@
                                  (expand-template slashed-modname)
                                  (lua-ext->fnl-ext)))]
         ;; preference lua files, init-macros.fnl, then init.fnl.
-        (or (and (not opts.fennel-only?) lua-template (file-exists? lua-template) (values lua-template))
-            (and macro-template (file-exists? macro-template) (values macro-template))
-            (and fnl-template (file-exists? fnl-template) (values fnl-template))
+        (or (and (not opts.fennel-only?)
+                 lua-template
+                 (file-exists? lua-template)
+                 (values lua-template))
+            (and macro-template
+                 (file-exists? macro-template)
+                 (values macro-template))
+            (and fnl-template
+                 (file-exists? fnl-template)
+                 (values fnl-template))
             (values nil))))))
 
 (fn searcher [dotted-modname opts]
