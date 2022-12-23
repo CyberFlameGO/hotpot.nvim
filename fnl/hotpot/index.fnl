@@ -47,6 +47,26 @@
         ;; still return the in-cache-path as a "hope"
         (nil err) (values in-cache-path)))))
 
+(fn fnl-path->lua-colocated-path [fnl-path]
+  ;; Given x/y/fnl/z/b -> x/y/lua/z/b
+  ;; TODO HACK WARNING: experimental, we just replace *the first* fnl instance
+  ;; with lua This will have bad effects given /home/fnl/projects/plugin/fnl/a.fnl!
+  (let [{: is-fnl-path? : join-path : path-separator} (require :hotpot.fs)
+        fnl-pattern (string.format "%sfnl%s" (path-separator) (path-separator))
+        lua-replacement (string.format "%slua%s" (path-separator) (path-separator))
+        _ (expect (is-fnl-path? fnl-path) "path did not end in fnl: %q" fnl-path)
+        lua-path (-> fnl-path
+                     (string.gsub fnl-pattern lua-replacement)
+                     (string.gsub "%.fnl$" ".lua"))]
+      (match (vim.loop.fs_realpath lua-path)
+        ;; real path returned something, which *may* be different to what we
+        ;; gave it, depending on symlinks etc, so we will return the "real
+        ;; path" incase its nicer.
+        real-path (values real-path)
+        ;; no real path means the file does not exist on disk, but we will
+        ;; still return the in-cache-path as a "hope"
+        (nil err) (values lua-path))))
+
 (λ new-module-record [modname files loader]
   {: modname : files :loader (string.dump loader)})
 
@@ -154,4 +174,5 @@
 {: new-index
  : new-indexed-searcher-fn
  : fnl-path->lua-cache-path
+ : fnl-path->lua-colocated-path
  : clear-record}
