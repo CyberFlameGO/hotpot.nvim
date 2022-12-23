@@ -89,9 +89,14 @@
         options (. config :compiler :modules)
         plugins (instantiate-plugins options.plugins)]
     (set options.plugins plugins))
-  (let [{: fnl-path->lua-cache-path} (require :hotpot.index)
+
+  (let [{: fnl-path->lua-cache-path
+         : fnl-path->lua-colocated-path} (require :hotpot.index)
+        {: config} (require :hotpot.runtime)
         {: deps-for-fnl-path} (require :hotpot.dependency-map)
-        lua-path (fnl-path->lua-cache-path mod-path)]
+        lua-path (if config.colocate
+                   (fnl-path->lua-colocated-path mod-path)
+                   (fnl-path->lua-cache-path mod-path))]
     (match (compile-fnl mod-path lua-path modname)
       true {:loader (loadfile lua-path)
             :deps (or (deps-for-fnl-path mod-path) [])}
@@ -114,13 +119,25 @@
         ;; We return our extra index data as a second value so the searcher is
         ;; still technically lua compatible.
         (values loader {:path mod-path :files file-stats}))
+      ;; TODO this could actually be a throw, as we did find something, just 
+      ;; we could not compile it - which should really stop other seachers.
+      ;; and we'd probably get clearer error reporting...
       (nil err) (values err))))
 
 (fn searcher [modname]
   ;; searcher will *always* compile fnl code out to cache, the index
   ;; should determine whether calling the searcher is required.
-  (let [{:searcher modname->path} (require :hotpot.searcher.source)]
-    (match (modname->path modname)
+  (let [{:searcher modname->path} (require :hotpot.searcher.source)
+        {: config} (require :hotpot.runtime)
+        ;; When colocating, we *always* look for fnl files and ignore any
+        ;; lua-precedence. Colocation implies that we can rely on standard
+        ;; infra (eg: any other *.lua loader in the chain)
+        ;; to pickup after we're done.
+        ;; TODO define option better, possibly as two separate options, or at least make the
+        ;; distinction that other loaders will do the ... loading as this has
+        ;; the knock on of disabling the internal byte cache.
+        opts {:fennel-only? config.colocate}]
+    (match (modname->path modname opts)
       path (create-loader modname path))))
 
 {: searcher}
