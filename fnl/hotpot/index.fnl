@@ -72,7 +72,9 @@
   ;; module (??) then we can potentially try to save to a non-existent dir
   ;; because we are relying on the compiler to create the target dir.
   (let [{: modules : path} index
+        {: dirname : make-path} (require :hotpot.fs)
         bytes (vim.mpack.encode {:version index-version :data modules})]
+    (-> path (dirname) (make-path))
     (with-open [fout (io.open path :wb)]
                (fout:write bytes))))
 
